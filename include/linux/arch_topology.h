@@ -39,7 +39,7 @@ unsigned long topology_get_cpu_efficiency(int cpu)
 DECLARE_PER_CPU(unsigned long, freq_scale);
 
 static inline
-unsigned long topology_get_freq_scale(struct sched_domain *sd, int cpu)
+unsigned long topology_get_freq_scale(int cpu)
 {
 	return per_cpu(freq_scale, cpu);
 }
