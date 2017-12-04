@@ -66,7 +66,8 @@ struct sugov_cpu {
 	struct sched_walt_cpu_load walt_load;
 
 	/* The fields below are only needed when sharing a policy. */
-	unsigned long util;
+	unsigned long util_cfs;
+	unsigned long util_dl;
 	unsigned long max;
 	unsigned int flags;
 
@@ -225,23 +226,27 @@ static unsigned int get_next_freq(struct sugov_policy *sg_policy,
 	return cpufreq_driver_resolve_freq(policy, freq);
 }
 
-static void sugov_get_util(unsigned long *util, unsigned long *max, int cpu)
+static void sugov_get_util(struct sugov_cpu *sg_cpu)
 {
-	struct rq *rq = cpu_rq(cpu);
-	unsigned long util_cfs = cpu_util_cfs(rq);
-	unsigned long util_dl  = cpu_util_dl(rq);
-	struct sugov_cpu *loadcpu = &per_cpu(sugov_cpu, cpu);
+	struct rq *rq = cpu_rq(sg_cpu->cpu);
+	struct sugov_cpu sg_cpu->loadcpu = &per_cpu(sugov_cpu, sg_cpu->cpu);
 
-	*max = arch_scale_cpu_capacity(NULL, cpu);
+	sg_cpu->max = arch_scale_cpu_capacity(NULL, sg_cpu->cpu);
+	sg_cpu->util_cfs = cpu_util_cfs(rq);
+	sg_cpu->util_dl  = cpu_util_dl(rq);
+}
 
-/*
+
+static unsigned long sugov_aggregate_util(struct sugov_cpu *sg_cpu)
+{
+	/*
 	 * Ideally we would like to set util_dl as min/guaranteed freq and
 	 * util_cfs + util_dl as requested freq. However, cpufreq is not yet
 	 * ready for such an interface. So, we only do the latter for now.
 	 */
-	*util = min(util_cfs + util_dl, *max);
+	return min(sg_cpu->util_cfs + sg_cpu->util_dl, sg_cpu->max);
 
-	*util = boosted_cpu_util(cpu, &loadcpu->walt_load);
+	return boosted_cpu_util(sg_cpu->cpu,&sg_cpu->loadcpu->walt_load);
 
 #ifdef CONFIG_UCLAMP_TASK
    	*util = uclamp_rq_util_with(rq, *util, NULL);
@@ -340,9 +345,11 @@ static void sugov_update_single(struct update_util_data *hook, u64 time,
 	if (flags & SCHED_CPUFREQ_RT) {
 		next_f = policy->cpuinfo.max_freq;
 	} else {
-		sugov_get_util(&util, &max, sg_cpu->cpu);
-
+		sugov_get_util(sg_cpu);
+		max = sg_cpu->max;
+		util = sugov_aggregate_util(sg_cpu);
         sugov_iowait_boost(sg_cpu, &util, &max);
+
 		next_f = get_next_freq(sg_policy, util, max);
 		/*
 		 * Do not reduce the frequency if the CPU has not been idle
@@ -388,9 +395,9 @@ static unsigned int sugov_next_freq_shared(struct sugov_cpu *sg_cpu, u64 time)
 
 		if (j_sg_cpu->flags & SCHED_CPUFREQ_RT)
 
-		j_util = j_sg_cpu->util;
 		j_max = j_sg_cpu->max;
-		if (j_util * max >= j_max * util) {
+		j_util = sugov_aggregate_util(j_sg_cpu);
+		if (j_util * max > j_max * util) {
 			util = j_util;
 			max = j_max;
 		}
@@ -405,20 +412,16 @@ static void sugov_update_shared(struct update_util_data *hook, u64 time,
 {
 	struct sugov_cpu *sg_cpu = container_of(hook, struct sugov_cpu, update_util);
 	struct sugov_policy *sg_policy = sg_cpu->sg_policy;
-	unsigned long util, max;
 	unsigned int next_f;
 
 	if (flags & SCHED_CPUFREQ_PL)
 		return;
 
-	sugov_get_util(&util, &max, sg_cpu->cpu);
-
 	flags &= ~SCHED_CPUFREQ_RT;
 
 	raw_spin_lock(&sg_policy->update_lock);
 
-	sg_cpu->util = util;
-	sg_cpu->max = max;
+	sugov_get_util(sg_cpu);
 	sg_cpu->flags = flags;
 
 	sugov_set_iowait_boost(sg_cpu, time);
