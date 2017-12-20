@@ -239,23 +239,34 @@ static void sugov_get_util(struct sugov_cpu *sg_cpu)
 
 static unsigned long sugov_aggregate_util(struct sugov_cpu *sg_cpu)
 {
+	struct rq *rq = cpu_rq(sg_cpu->cpu);
+	unsigned long util;
+
+	if (rq->rt.rt_nr_running) {
+		util = sg_cpu->max;
+	} else {
+		util = sg_cpu->util_dl;
+		if (rq->cfs.h_nr_running)
+			util += sg_cpu->util_cfs;
+	}
+
 	/*
 	 * Ideally we would like to set util_dl as min/guaranteed freq and
 	 * util_cfs + util_dl as requested freq. However, cpufreq is not yet
 	 * ready for such an interface. So, we only do the latter for now.
 	 */
-	return min(sg_cpu->util_cfs + sg_cpu->util_dl, sg_cpu->max);
+	return min(util, sg_cpu->max);
 
 	return boosted_cpu_util(sg_cpu->cpu,&sg_cpu->loadcpu->walt_load);
 
 #ifdef CONFIG_UCLAMP_TASK
-   	*util = uclamp_rq_util_with(rq, *util, NULL);
-#endif	
+   	return uclamp_rq_util_with(rq, util, NULL);
+#endif
 }
 
-static void sugov_set_iowait_boost(struct sugov_cpu *sg_cpu, u64 time)
+static void sugov_set_iowait_boost(struct sugov_cpu *sg_cpu, u64 time, unsigned int flags)
 {
-	if (sg_cpu->flags & SCHED_CPUFREQ_IOWAIT) {
+	if (flags & SCHED_CPUFREQ_IOWAIT) {
 		if (sg_cpu->iowait_boost_pending)
 			return;
 
@@ -324,7 +335,6 @@ static void sugov_update_single(struct update_util_data *hook, u64 time,
 {
 	struct sugov_cpu *sg_cpu = container_of(hook, struct sugov_cpu, update_util);
 	struct sugov_policy *sg_policy = sg_cpu->sg_policy;
-	struct cpufreq_policy *policy = sg_policy->policy;
 	unsigned long util, max;
 	unsigned int next_f;
 	bool busy;
@@ -333,7 +343,7 @@ static void sugov_update_single(struct update_util_data *hook, u64 time,
 		return;
 
 	flags &= ~SCHED_CPUFREQ_RT;
-	sugov_set_iowait_boost(sg_cpu, time);
+	sugov_set_iowait_boost(sg_cpu, time, flags);
 	sg_cpu->last_update = time;
 
 	if (!sugov_should_update_freq(sg_policy, time))
@@ -342,9 +352,6 @@ static void sugov_update_single(struct update_util_data *hook, u64 time,
 	busy = use_pelt() && sugov_cpu_is_busy(sg_cpu);
 
 
-	if (flags & SCHED_CPUFREQ_RT) {
-		next_f = policy->cpuinfo.max_freq;
-	} else {
 		sugov_get_util(sg_cpu);
 		max = sg_cpu->max;
 		util = sugov_aggregate_util(sg_cpu);
@@ -359,10 +366,10 @@ static void sugov_update_single(struct update_util_data *hook, u64 time,
 		    sg_policy->next_freq != UINT_MAX) {
 			next_f = sg_policy->next_freq;
 
-			/* Reset cached freq as next_freq has changed */
-			sg_policy->cached_raw_freq = 0;
-		}
+		/* Reset cached freq as next_freq has changed */
+		sg_policy->cached_raw_freq = 0;
 	}
+
 	sugov_update_commit(sg_policy, time, next_f);
 }
 
@@ -379,6 +386,8 @@ static unsigned int sugov_next_freq_shared(struct sugov_cpu *sg_cpu, u64 time)
 		unsigned long j_util, j_max;
 		s64 delta_ns;
 
+		sugov_get_util(j_sg_cpu);
+
 		/*
 		 * If the CFS CPU utilization was last updated before the
 		 * previous frequency update and the time elapsed between the
@@ -392,20 +401,15 @@ static unsigned int sugov_next_freq_shared(struct sugov_cpu *sg_cpu, u64 time)
 		if (delta_ns > stale_ns) {
 			j_sg_cpu->iowait_boost = 0;
 			j_sg_cpu->iowait_boost_pending = false;
-			j_sg_cpu->util_cfs = 0;
-			if (j_sg_cpu->util_dl == 0)
-				continue;
 		}
-
-		if (j_sg_cpu->flags & SCHED_CPUFREQ_RT)
 
 		j_max = j_sg_cpu->max;
 		j_util = sugov_aggregate_util(j_sg_cpu);
+		sugov_iowait_boost(j_sg_cpu, &j_util, &j_max);
 		if (j_util * max > j_max * util) {
 			util = j_util;
 			max = j_max;
 		}
-		sugov_iowait_boost(j_sg_cpu, &util, &max);
 	}
 
 	return get_next_freq(sg_policy, util, max);
@@ -425,17 +429,11 @@ static void sugov_update_shared(struct update_util_data *hook, u64 time,
 
 	raw_spin_lock(&sg_policy->update_lock);
 
-	sugov_get_util(sg_cpu);
-	sg_cpu->flags = flags;
-
-	sugov_set_iowait_boost(sg_cpu, time);
+	sugov_set_iowait_boost(sg_cpu, time, flags);
 	sg_cpu->last_update = time;
 
 	if (sugov_should_update_freq(sg_policy, time) &&
 		!(flags & SCHED_CPUFREQ_CONTINUE)) {
-		if (flags & SCHED_CPUFREQ_RT)
-			next_f = sg_policy->policy->cpuinfo.max_freq;
-		else
 			next_f = sugov_next_freq_shared(sg_cpu, time);
 
 		sugov_update_commit(sg_policy, time, next_f);
