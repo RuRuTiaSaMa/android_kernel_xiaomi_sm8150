@@ -26,6 +26,7 @@
 #include <linux/kernel_stat.h>
 #include <linux/binfmts.h>
 #include <linux/mutex.h>
+#include <linux/energy_model.h>
 #include <linux/psi.h>
 #include <linux/spinlock.h>
 #include <linux/stop_machine.h>
@@ -731,11 +732,16 @@ static inline bool sched_asym_prefer(int a, int b)
 {
 	return arch_asym_cpu_priority(a) > arch_asym_cpu_priority(b);
 }
-
 struct max_cpu_capacity {
 	raw_spinlock_t lock;
 	unsigned long val;
 	int cpu;
+};
+
+struct perf_domain {
+	struct em_perf_domain *em_pd;
+	struct perf_domain *next;
+	struct rcu_head rcu;
 };
 
 /*
@@ -796,6 +802,12 @@ struct root_domain {
 	int max_cap_orig_cpu, min_cap_orig_cpu;
 	/* First cpu with mid capacity */
 	int mid_cap_orig_cpu;
+
+	/*
+	 * NULL-terminated list of performance domains intersecting with the
+	 * CPUs of the rd. Protected by RCU.
+	 */
+	struct perf_domain	*pd;
 };
 
 extern struct root_domain def_root_domain;
@@ -3420,4 +3432,10 @@ static inline unsigned long cpu_util_cfs(struct rq *rq)
 	return rq->cfs.avg.util_avg;
 }
 
+#ifdef CONFIG_SMP
+#ifdef CONFIG_ENERGY_MODEL
+#define perf_domain_span(pd) (to_cpumask(((pd)->em_pd->cpus)))
+#else
+#define perf_domain_span(pd) NULL
+#endif
 #endif
