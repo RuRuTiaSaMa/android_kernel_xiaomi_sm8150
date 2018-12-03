@@ -21,6 +21,8 @@
 
 #define SUGOV_KTHREAD_PRIORITY	50
 
+#include <linux/sched/cpufreq.h>
+
 struct sugov_tunables {
 	struct gov_attr_set attr_set;
 	unsigned int		up_rate_limit_us;
@@ -211,7 +213,7 @@ static unsigned int get_next_freq(struct sugov_policy *sg_policy,
 	unsigned int freq = arch_scale_freq_invariant() ?
 				policy->cpuinfo.max_freq : policy->cur;
 
-	freq = (freq + (freq >> 2)) * util / max;
+	freq = map_util_freq(util, freq, max);
 
 	if (freq == sg_policy->cached_raw_freq && !sg_policy->need_freq_update)
 		return sg_policy->next_freq;
@@ -221,22 +223,30 @@ static unsigned int get_next_freq(struct sugov_policy *sg_policy,
 	return cpufreq_driver_resolve_freq(policy, freq);
 }
 
-static void sugov_get_util(struct sugov_cpu *sg_cpu)
+unsigned long schedutil_freq_util(int cpu, unsigned long util_cfs,
+				  unsigned long max, enum schedutil_type type)
 {
-	struct rq *rq = cpu_rq(sg_cpu->cpu);
+	unsigned long dl_util, util;
+	struct rq *rq = cpu_rq(cpu);
 
-	sg_cpu->max = arch_scale_cpu_capacity(NULL, sg_cpu->cpu);
-	sg_cpu->util_cfs = cpu_util_cfs(rq);
-	sg_cpu->util_dl  = cpu_util_dl(rq);
-}
+	if (type == FREQUENCY_UTIL && rt_rq_is_runnable(&rq->rt))
+		return max;
 
+    /*
+	 * Because the time spend on RT/DL tasks is visible as 'lost' time to
+	 * CFS tasks and we use the same metric to track the effective
+	 * utilization (PELT windows are synchronized) we can directly add them
+	 * to obtain the CPU's actual utilization.
+	 */
+	util = util_cfs;
+	dl_util = cpu_util_dl(rq);
 
-static unsigned long sugov_aggregate_util(struct sugov_cpu *sg_cpu)
-{
-	struct rq *rq = cpu_rq(sg_cpu->cpu);
-
-	if (rt_rq_is_runnable(&rq->rt))
-		return sg_cpu->max;
+	/*
+	 * OTOH, for energy computation we need the estimated running time, so
+	 * include util_dl and ignore dl_bw.
+	 */
+	if (type == ENERGY_UTIL)
+		util += 0;
 
 	/*
 	 * Utilization required by DEADLINE must always be granted while, for
@@ -248,12 +258,27 @@ static unsigned long sugov_aggregate_util(struct sugov_cpu *sg_cpu)
 	 * util_cfs + util_dl as requested freq. However, cpufreq is not yet
 	 * ready for such an interface. So, we only do the latter for now.
 	 */
-	return min(sg_cpu->max, (sg_cpu->util_dl + sg_cpu->util_cfs));
+	if (type == FREQUENCY_UTIL)
+		util += dl_util;
+
+	return min(max, util);
+}
+
+static unsigned long sugov_get_util(struct sugov_cpu *sg_cpu)
+{
+	struct rq *rq = cpu_rq(sg_cpu->cpu);
+	unsigned long util;
+	unsigned long max = arch_scale_cpu_capacity(NULL, sg_cpu->cpu);
+
+	sg_cpu->max = max;
+	sg_cpu->util_dl = cpu_util_dl(rq);
 
 #ifdef CONFIG_UCLAMP_TASK
-    unsigned long util;
     util =cpu_util_freq_walt(sg_cpu->cpu, &sg_cpu->walt_load);
    	return uclamp_rq_util_with(rq, util, NULL);
+#else
+    util = cpu_util_cfs(rq);
+	return schedutil_freq_util(sg_cpu->cpu, util, max, FREQUENCY_UTIL);
 #endif
 }
 
@@ -442,9 +467,8 @@ static void sugov_update_single(struct update_util_data *hook, u64 time,
 
 	busy = use_pelt() && sugov_cpu_is_busy(sg_cpu);
 
-		sugov_get_util(sg_cpu);
+		util = sugov_get_util(sg_cpu);
 		max = sg_cpu->max;
-		util = sugov_aggregate_util(sg_cpu);
         sugov_iowait_apply(sg_cpu, time, &util, &max);
 
 		next_f = get_next_freq(sg_policy, util, max);
@@ -474,9 +498,8 @@ static unsigned int sugov_next_freq_shared(struct sugov_cpu *sg_cpu, u64 time)
 		struct sugov_cpu *j_sg_cpu = &per_cpu(sugov_cpu, j);
 		unsigned long j_util, j_max;
 
-		sugov_get_util(j_sg_cpu);
+		j_util = sugov_get_util(j_sg_cpu);
 		j_max = j_sg_cpu->max;
-		j_util = sugov_aggregate_util(j_sg_cpu);
 		sugov_iowait_apply(j_sg_cpu, time, &j_util, &j_max);
 
 		if (j_util * max > j_max * util) {
