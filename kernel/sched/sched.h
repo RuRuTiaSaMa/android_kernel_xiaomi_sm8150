@@ -3439,3 +3439,7 @@ static inline unsigned long cpu_util_cfs(struct rq *rq)
 #else
 #define perf_domain_span(pd) NULL
 #endif
+
+#ifdef CONFIG_SMP
+extern struct static_key_false sched_energy_present;
+#endif
