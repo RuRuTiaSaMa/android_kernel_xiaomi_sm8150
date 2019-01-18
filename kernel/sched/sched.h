@@ -3458,11 +3458,6 @@ static inline void walt_map_freq_to_load(void) { }
 static inline void walt_update_min_max_capacity(void) { }
 #endif	/* CONFIG_SCHED_WALT */
 
-static inline bool energy_aware(void)
-{
-	return sched_feat(ENERGY_AWARE);
-}
-
 struct sched_avg_stats {
 	int nr;
 	int nr_misfit;

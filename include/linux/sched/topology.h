@@ -197,7 +197,6 @@ typedef const struct cpumask *(*sched_domain_mask_f)(int cpu);
 typedef int (*sched_domain_flags_f)(void);
 typedef
 const struct sched_group_energy * const(*sched_domain_energy_f)(int cpu);
-extern bool sched_is_energy_aware(void);
 
 #define SDTL_OVERLAP	0x01
 

@@ -1588,7 +1588,7 @@ select_task_rq_rt(struct task_struct *p, int cpu, int sd_flag, int flags,
 	 * systems like big.LITTLE.
 	 */
 	may_not_preempt = task_may_not_preempt(curr, cpu);
-	test = energy_aware() || may_not_preempt ||
+	test = static_branch_unlikely(&sched_energy_present) || may_not_preempt ||
 	    (unlikely(rt_task(curr)) &&
 	     (curr->nr_cpus_allowed < 2 ||
 	      curr->prio <= p->prio));
@@ -1931,7 +1931,7 @@ static int find_lowest_rq(struct task_struct *task)
 			 rt_task_fits_capacity))
 		return -1; /* No targets found */
 
-	if (energy_aware())
+	if (static_branch_unlikely(&sched_energy_present))
 		cpu = rt_energy_aware_wake_cpu(task);
 
 	if (cpu == -1)
