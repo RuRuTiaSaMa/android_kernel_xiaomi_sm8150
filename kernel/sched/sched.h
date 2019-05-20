@@ -60,6 +60,7 @@ struct sched_walt_cpu_load {
 	unsigned long prev_window_util;
 	unsigned long nl;
 	unsigned long pl;
+	bool rtgb_active;
 	u64 ws;
 };
 
@@ -112,7 +113,6 @@ struct sched_cluster {
 	unsigned int max_possible_freq;
 	bool freq_init_done;
 	u64 aggr_grp_load;
-	u64 coloc_boost_load;
 };
 
 extern cpumask_t asym_cap_sibling_cpus;
@@ -3020,8 +3020,6 @@ static inline enum sched_boost_policy task_boost_policy(struct task_struct *p)
 	return policy;
 }
 
-extern void walt_map_freq_to_load(void);
-
 static inline bool is_min_capacity_cluster(struct sched_cluster *cluster)
 {
 	return is_min_capacity_cpu(cluster_first_cpu(cluster));
@@ -3154,7 +3152,6 @@ static inline unsigned int power_cost(int cpu, u64 demand)
 #endif
 
 static inline void note_task_waking(struct task_struct *p, u64 wallclock) { }
-static inline void walt_map_freq_to_load(void) { }
 #endif	/* CONFIG_SCHED_WALT */
 
 struct sched_avg_stats {
