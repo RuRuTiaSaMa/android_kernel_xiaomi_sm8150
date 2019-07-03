@@ -2621,7 +2621,11 @@ void update_best_cluster(struct related_thread_group *grp,
 				   u64 demand, bool boost)
 {
 	if (boost) {
-		grp->skip_min = true;
+		/*
+		 * since we are in boost, we can keep grp on min, the boosts
+		 * will ensure tasks get to bigs
+		 */
+		grp->skip_min = false;
 		return;
 	}
 
@@ -3177,8 +3181,7 @@ static void walt_update_coloc_boost_load(void)
 	struct related_thread_group *grp;
 	struct sched_cluster *cluster;
 
-	if (!sysctl_sched_little_cluster_coloc_fmin_khz ||
-			sched_boost() == CONSERVATIVE_BOOST)
+	if (!sysctl_sched_little_cluster_coloc_fmin_khz)
 		return;
 
 	grp = lookup_related_thread_group(DEFAULT_CGROUP_COLOC_ID);
