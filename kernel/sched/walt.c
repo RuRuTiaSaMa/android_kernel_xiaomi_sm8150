@@ -509,6 +509,7 @@ static inline u64 freq_policy_load(struct rq *rq)
 	u64 aggr_grp_load = cluster->aggr_grp_load;
 	u64 load, tt_load = 0;
 	u64 coloc_boost_load = cluster->coloc_boost_load;
+	struct task_struct *cpu_ksoftirqd = per_cpu(ksoftirqd, cpu_of(rq));
 
 	if (rq->ed_task != NULL) {
 		load = sched_ravg_window;
@@ -522,6 +523,9 @@ static inline u64 freq_policy_load(struct rq *rq)
 
 	if (coloc_boost_load)
 		load = max_t(u64, load, coloc_boost_load);
+
+	if (cpu_ksoftirqd && cpu_ksoftirqd->state == TASK_RUNNING)
+		load = max_t(u64, load, task_load(cpu_ksoftirqd));
 
 	tt_load = top_task_load(rq);
 	switch (reporting_policy) {
