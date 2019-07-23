@@ -47,6 +47,10 @@ extern unsigned int sysctl_sched_min_task_util_for_colocation;
 extern unsigned int sysctl_sched_asym_cap_sibling_freq_match_pct;
 extern unsigned int sysctl_sched_coloc_downmigrate_ns;
 extern unsigned int sysctl_sched_task_unfilter_nr_windows;
+extern unsigned int sysctl_sched_busy_hyst_enable_cpus;
+extern unsigned int sysctl_sched_busy_hyst;
+extern unsigned int sysctl_sched_coloc_busy_hyst_enable_cpus;
+extern unsigned int sysctl_sched_coloc_busy_hyst;
 extern unsigned int sysctl_sched_window_stats_policy;
 
 extern int
@@ -149,7 +153,6 @@ extern int sysctl_schedstats(struct ctl_table *table, int write,
 extern char sched_lib_name[LIB_PATH_LENGTH];
 extern unsigned int sched_lib_mask_force;
 extern bool is_sched_lib_based_app(pid_t pid);
-extern unsigned int sysctl_sched_busy_hysteresis_enable_cpus;
 
 
 #if defined(CONFIG_ENERGY_MODEL) && defined(CONFIG_CPU_FREQ_GOV_SCHEDUTIL)
