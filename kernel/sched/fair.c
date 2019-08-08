@@ -7393,6 +7393,7 @@ struct find_best_target_env {
 	bool is_rtg;
 	int placement_boost;
 	bool need_idle;
+	bool boosted;
 	int fastpath;
 	int skip_cpu;
 	int start_cpu;
@@ -8177,12 +8178,7 @@ static int find_energy_efficient_cpu(struct sched_domain *sd,
 	int placement_boost = task_boost_policy(p);
 	u64 start_t = 0;
 	int next_cpu = -1, backup_cpu = -1;
-#ifdef CONFIG_SCHED_TUNE
-	bool prefer_high_cap = schedtune_prefer_high_cap(p);
-	int boosted = (schedtune_task_boost(p) > 0 || per_task_boost(p) > 0);
-#elif  CONFIG_UCLAMP_TASK
-	int boosted = (uclamp_boosted(p) > 0 || per_task_boost(p) > 0);
-#endif
+    bool boosted = fbt_env->boosted;
 
     int start_cpu = get_start_cpu(p);
 
@@ -8270,6 +8266,7 @@ static int find_energy_efficient_cpu(struct sched_domain *sd,
 		fbt_env.skip_cpu = is_many_wakeup(sibling_count_hint) ?
 				   cpu : -1;
 		fbt_env.start_cpu = start_cpu;
+		fbt_env.boosted = boosted;
 
 		/* Find a cpu with sufficient capacity */
 		target_cpu = find_best_target(p, &eenv->cpu[EAS_CPU_BKP].cpu_id,
