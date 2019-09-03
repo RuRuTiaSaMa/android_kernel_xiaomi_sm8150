@@ -7368,9 +7368,11 @@ static inline bool task_fits_max(struct task_struct *p, int cpu)
 
 	if ((task_boost_policy(p) == SCHED_BOOST_ON_BIG ||
 #ifdef CONFIG_SCHED_TUNE
-			schedtune_task_boost(p) > 0) &&
+			schedtune_task_boost(p) > 0 ||
+			walt_should_kick_upmigrate(p, cpu)) &&
 #elif  CONFIG_UCLAMP_TASK
-			uclamp_boosted(p) > 0) &&
+			uclamp_boosted(p) > 0 ||
+			walt_should_kick_upmigrate(p, cpu)) &&
 #endif
 			is_min_capacity_cpu(cpu))
 		return false;
