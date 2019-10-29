@@ -178,6 +178,8 @@ static int exfat_show_options(struct seq_file *m, struct dentry *root)
 	seq_printf(m, ",fmask=%04o,dmask=%04o", opts->fs_fmask, opts->fs_dmask);
 	if (opts->allow_utime)
 		seq_printf(m, ",allow_utime=%04o", opts->allow_utime);
+	if (opts->quiet)
+		seq_puts(m, ",quiet");
 	if (opts->utf8)
 		seq_puts(m, ",iocharset=utf8");
 	else if (sbi->nls_io)
@@ -267,6 +269,7 @@ enum {
 	Opt_allow_utime,
 	Opt_charset,
 	Opt_errors,
+	Opt_quiet,
 	Opt_discard,
 	Opt_time_offset,
 
@@ -310,6 +313,7 @@ static const struct fs_parameter_spec exfat_param_specs[] = {
 #else
 	fsparam_enum("errors",			Opt_errors),
 #endif
+    fsparam_enum("quiet",			Opt_quiet),
 	fsparam_flag("discard",			Opt_discard),
 	fsparam_s32("time_offset",		Opt_time_offset),
 	__fsparam(NULL, "utf8",			Opt_utf8, fs_param_deprecated,
@@ -373,6 +377,8 @@ static int exfat_parse_param(struct fs_context *fc, struct fs_parameter *param)
 		break;
 	case Opt_errors:
 		opts->errors = result.uint_32;
+	case Opt_quiet:
+		opts->quiet = 1;
 		break;
 	case Opt_discard:
 		opts->discard = 1;
@@ -410,6 +416,7 @@ enum {
 	Opt_err_panic,
 	Opt_err_ro,
 	Opt_err,
+	Opt_quiet,
 	Opt_discard,
 	Opt_time_offset,
 
@@ -428,6 +435,7 @@ static const match_table_t exfat_tokens = {
 	{Opt_dmask, "dmask=%o"},
 	{Opt_fmask, "fmask=%o"},
 	{Opt_allow_utime, "allow_utime=%o"},
+	{Opt_quiet, "quiet"},
 	{Opt_charset, "iocharset=%s"},
 	{Opt_err_cont, "errors=continue"},
 	{Opt_err_panic, "errors=panic"},
@@ -500,6 +508,9 @@ static int parse_options(struct super_block *sb, char *options, int silent,
 					return -ENOMEM;
 				opts->iocharset = tmpstr;
 				break;
+			case Opt_quiet:
+		        opts->quiet = 1;
+		        break;
 			case Opt_err_cont:
 				opts->errors = EXFAT_ERRORS_CONT;
 				break;
