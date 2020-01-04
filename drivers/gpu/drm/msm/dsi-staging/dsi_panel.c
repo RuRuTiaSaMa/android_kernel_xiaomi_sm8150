@@ -3636,24 +3636,6 @@ static int dsi_panel_parse_esd_config(struct dsi_panel *panel)
 	esd_config = &panel->esd_config;
 	esd_config->status_mode = ESD_MODE_MAX;
 
-	/* esd-err-flag method will be prefered */
-	esd_config->esd_err_irq_gpio = of_get_named_gpio_flags(
-			panel->panel_of_node,
-			"qcom,esd-err-irq-gpio",
-			0,
-			(enum of_gpio_flags *)&(esd_config->esd_err_irq_flags));
-	if (gpio_is_valid(esd_config->esd_err_irq_gpio)) {
-		esd_config->esd_err_irq = gpio_to_irq(esd_config->esd_err_irq_gpio);
-		rc = gpio_request(esd_config->esd_err_irq_gpio, "esd_err_irq_gpio");
-		if (rc)
-			pr_err("%s: Failed to get esd irq gpio %d (code: %d)",
-				__func__, esd_config->esd_err_irq_gpio, rc);
-		else
-			gpio_direction_input(esd_config->esd_err_irq_gpio);
-
-		return 0;
-	}
-
 	esd_config->esd_enabled = utils->read_bool(utils->data,
 		"qcom,esd-check-enabled");
 
@@ -5502,7 +5484,6 @@ int dsi_panel_enable(struct dsi_panel *panel)
 	panel->in_aod = false;
 	panel->skip_dimmingon = STATE_NONE;
 	panel->last_bl_lvl = 1 ;
-
 
 	if (panel->fodflag) {
 		pr_info("%s fod_dimlayer_bl_block\n", __func__);
