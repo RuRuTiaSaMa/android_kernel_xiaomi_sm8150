@@ -7455,7 +7455,6 @@ enum fastpaths {
 	NONE = 0,
 	SYNC_WAKEUP,
 	PREV_CPU_FASTPATH,
-	MANY_WAKEUP,
 };
 
 static inline int find_best_target(struct task_struct *p, int *backup_cpu,
@@ -8121,13 +8120,22 @@ static int find_energy_efficient_cpu(struct sched_domain *sd,
 	int boosted = (uclamp_boosted(p) > 0 || per_task_boost(p) > 0);
 #endif
 
-    int start_cpu = get_start_cpu(p);
+    int start_cpu;
+
+	if (is_many_wakeup(sibling_count_hint) && prev_cpu != cpu &&
+				bias_to_this_cpu(p, prev_cpu, start_cpu))
+		return prev_cpu;
+
+	start_cpu = get_start_cpu(p);
 
 	is_rtg = task_in_related_thread_group(p);
 	curr_is_rtg = task_in_related_thread_group(cpu_rq(cpu)->curr);
 
 	fbt_env.fastpath = 0;
 	fbt_env.need_idle = 0;
+
+    if (start_cpu < 0)
+		goto eas_not_ready;
 
 	if (trace_sched_task_util_enabled())
 		start_t = sched_clock();
@@ -8141,14 +8149,7 @@ static int find_energy_efficient_cpu(struct sched_domain *sd,
 		fbt_env.fastpath = SYNC_WAKEUP;
 		goto out;
 	}
-
-	if (is_many_wakeup(sibling_count_hint) && prev_cpu != cpu &&
-				bias_to_this_cpu(p, prev_cpu, start_cpu)) {
-		target_cpu = prev_cpu;
-		fbt_env.fastpath = MANY_WAKEUP;
-		goto out;
-	}
-
+	
 	/* prepopulate energy diff environment */
 	eenv = get_eenv(p, prev_cpu);
 	if (eenv->max_cpu_count < 2)
@@ -8263,6 +8264,8 @@ out:
 			need_idle, fbt_env.fastpath, placement_boost, start_t,
 			boosted, is_rtg, get_rtg_status(p), start_cpu);
 	return target_cpu;
+eas_not_ready:
+    return -1;
 }
 
 static inline bool nohz_kick_needed(struct rq *rq, bool only_update);
