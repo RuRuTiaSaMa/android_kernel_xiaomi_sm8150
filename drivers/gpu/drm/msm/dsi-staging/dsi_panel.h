@@ -415,6 +415,6 @@ int dsi_panel_write_cmd_set(struct dsi_panel *panel, struct dsi_panel_cmd_set *c
 int dsi_panel_read_cmd_set(struct dsi_panel *panel, struct dsi_read_config *read_config);
 
 void dsi_panel_calc_dsi_transfer_time(struct dsi_host_common_cfg *config,
-		struct dsi_mode_info *timing);
+		struct dsi_display_mode *mode, u32 frame_threshold_us);
 
 #endif /* _DSI_PANEL_H_ */
