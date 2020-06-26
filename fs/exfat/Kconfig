@@ -19,3 +19,19 @@ config EXFAT_DEFAULT_IOCHARSET
 	  converting between the encoding is used for user visible filename and
 	  UTF-16 character that exfat filesystem use, and can be overridden with
 	  the "iocharset" mount option for exFAT filesystems.
+
+config EXFAT_VIRTUAL_XATTR
+	bool "Virtual xattr support for exFAT"
+	default y
+	depends on EXFAT_FS
+	help
+	  To support virtual xattr.
+
+config EXFAT_VIRTUAL_XATTR_SELINUX_LABEL
+	string "Default string for SELinux label"
+	default "u:object_r:exfat:s0"
+	depends on EXFAT_VIRTUAL_XATTR
+	help
+	  Set this to the default string for SELinux label.
+	  Support for "u:object_r:exfat:s0" was added in Android Pie,
+	  if you're running Oreo or lower, use "u:object_r:vfat:s0" instead.
