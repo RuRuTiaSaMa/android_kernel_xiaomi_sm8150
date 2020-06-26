@@ -1123,6 +1123,8 @@ static int __init init_exfat_fs(void)
 {
 	int err;
 
+	pr_info("exFAT: file-system version %s\n", EXFAT_VERSION);
+
 	err = exfat_cache_init();
 	if (err)
 		return err;
@@ -1168,4 +1170,3 @@ MODULE_ALIAS_FS("exfat");
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("exFAT filesystem support");
 MODULE_AUTHOR("Samsung Electronics Co., Ltd.");
-MODULE_VERSION(EXFAT_VERSION);
