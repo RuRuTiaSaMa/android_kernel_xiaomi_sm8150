@@ -11,7 +11,6 @@
 #include <linux/sched/signal.h>
 #endif
 
-#include "exfat_raw.h"
 #include "exfat_fs.h"
 
 static const unsigned char free_bit[] = {

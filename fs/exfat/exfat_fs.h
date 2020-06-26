@@ -10,6 +10,7 @@
 #include <linux/fs.h>
 #include <linux/ratelimit.h>
 #include <linux/nls.h>
+#include "exfat_raw.h"
 
 #define EXFAT_VERSION		"5.14.1"
 

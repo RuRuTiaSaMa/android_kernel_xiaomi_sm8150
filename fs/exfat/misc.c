@@ -12,7 +12,6 @@
 #include <linux/buffer_head.h>
 #include <linux/blk_types.h>
 
-#include "exfat_raw.h"
 #include "exfat_fs.h"
 
 /*
