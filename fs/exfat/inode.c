@@ -16,7 +16,7 @@
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 16, 0)
 #include <linux/iversion.h>
 #endif
-#include "exfat_raw.h"
+
 #include "exfat_fs.h"
 
 static int __exfat_write_inode(struct inode *inode, int sync)

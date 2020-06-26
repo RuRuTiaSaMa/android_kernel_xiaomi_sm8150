@@ -12,7 +12,6 @@
 #include <linux/compat.h>
 #include <linux/blkdev.h>
 
-#include "exfat_raw.h"
 #include "exfat_fs.h"
 
 static int exfat_cont_expand(struct inode *inode, loff_t size)

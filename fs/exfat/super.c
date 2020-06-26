@@ -27,7 +27,6 @@
 #include <linux/iversion.h>
 #endif
 
-#include "exfat_raw.h"
 #include "exfat_fs.h"
 
 #ifndef CONFIG_EXFAT_DEFAULT_IOCHARSET /* if Kconfig lacked iocharset */
