@@ -21,6 +21,12 @@ config SECURE_TOUCH
 config I2C_BY_DMA
     bool "I2C BY DMA"
 
+config TOUCHSCREEN_TDDI_DBCLK
+        bool "TDDI IC enable double click"
+        help
+          Say Y here if you have a tddi ic and want keep avdd,avee
+          when suspend.
+
 config TOUCHSCREEN_PROPERTIES
 	def_tristate INPUT
 	depends on INPUT
