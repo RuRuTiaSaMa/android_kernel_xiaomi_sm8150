@@ -631,14 +631,6 @@ dtc_tests () {
         run_test dtbs_equal_ordered $tree.test.dtb $tree.test.dts.test.dtb
     done
 
-    # Check -Oyaml output
-    if ! $no_yaml; then
-            for tree in type-preservation; do
-                run_dtc_test -I dts -O yaml -o $tree.test.dt.yaml "$SRCDIR/$tree.dts"
-                run_wrap_test cmp "$SRCDIR/$tree.dt.yaml" $tree.test.dt.yaml
-            done
-    fi
-
     # Check version conversions
     for tree in test_tree1.dtb ; do
 	 for aver in 1 2 3 16 17; do

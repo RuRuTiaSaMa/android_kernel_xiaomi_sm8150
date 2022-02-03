@@ -14,7 +14,6 @@ matrix:
             - swig
             - python-dev
             - valgrind
-            - libyaml-0-2
         coverity_scan:
           project:
             name: dtc
@@ -27,7 +26,7 @@ matrix:
         - make check && make checkm
 
     # Check it builds properly without optional packages:
-    #     python, valgrind, libyaml
+    #     python, valgrind
     - script:
         - make
         - make check
@@ -38,7 +37,6 @@ matrix:
           - swig
           - python-dev
           - valgrind
-          - libyaml-0-2
       script:
         - make
         - make check checkm
@@ -48,7 +46,6 @@ matrix:
         apt_packages:
           - swig
           - python-dev
-          - libyaml-0-2
       script:
         - make
         - make check
@@ -59,7 +56,6 @@ matrix:
           - swig
           - python-dev
           - valgrind
-          - libyaml-0-2
       script:
         - make
         - make check checkm
