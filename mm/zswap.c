@@ -74,8 +74,8 @@ static u64 zswap_duplicate_entry;
 
 #define ZSWAP_PARAM_UNSET ""
 
-/* Enable/disable zswap (enabled by default) */
-static bool zswap_enabled = 1;
+/* Enable/disable zswap (disabled by default) */
+static bool zswap_enabled = 0;
 static int zswap_enabled_param_set(const char *,
 				   const struct kernel_param *);
 static const struct kernel_param_ops zswap_enabled_param_ops = {
@@ -85,7 +85,7 @@ static const struct kernel_param_ops zswap_enabled_param_ops = {
 module_param_cb(enabled, &zswap_enabled_param_ops, &zswap_enabled, 0644);
 
 /* Crypto compressor to use */
-#define ZSWAP_COMPRESSOR_DEFAULT "lz4"
+#define ZSWAP_COMPRESSOR_DEFAULT "zstd"
 static char *zswap_compressor = ZSWAP_COMPRESSOR_DEFAULT;
 static int zswap_compressor_param_set(const char *,
 				      const struct kernel_param *);
