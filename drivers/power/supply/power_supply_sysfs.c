@@ -46,7 +46,7 @@ static const char * const power_supply_type_text[] = {
 	"USB_PD", "USB_PD_DRP", "BrickID",
 	"USB_HVDCP", "USB_HVDCP_3", "USB_HVDCP_3P5", "Wireless", "USB_FLOAT",
 	"BMS", "Parallel", "Main", "Wipower", "USB_C_UFP", "USB_C_DFP",
-	"Charge_Pump",
+	"Charge_Pump","ZIMI_CAR_POWER"
 };
 
 static const char * const power_supply_status_text[] = {
@@ -160,9 +160,38 @@ static ssize_t power_supply_show_property(struct device *dev,
 			       power_supply_health_text[value.intval]);
 	else if (off >= POWER_SUPPLY_PROP_MODEL_NAME)
 		return sprintf(buf, "%s\n", value.strval);
-
 	if (off == POWER_SUPPLY_PROP_CHARGE_COUNTER_EXT)
 		return sprintf(buf, "%lld\n", value.int64val);
+	else if (off == POWER_SUPPLY_PROP_WIRELESS_VERSION)
+		return scnprintf(buf, PAGE_SIZE, "0x%x\n",
+				value.intval);
+	else if (off == POWER_SUPPLY_PROP_WIRELESS_WAKELOCK)
+		return scnprintf(buf, PAGE_SIZE, "%d\n",
+				value.intval);
+	else if (off == POWER_SUPPLY_PROP_SIGNAL_STRENGTH)
+		return scnprintf(buf, PAGE_SIZE, "%d\n",
+				value.intval);
+	else if (off == POWER_SUPPLY_PROP_WIRELESS_CP_EN)
+		return scnprintf(buf, PAGE_SIZE, "%d\n",
+				value.intval);
+	else if (off == POWER_SUPPLY_PROP_TYPE_RECHECK)
+		return scnprintf(buf, PAGE_SIZE, "0x%x\n",
+				value.intval);
+	else if (off == POWER_SUPPLY_PROP_TX_MAC)
+		return scnprintf(buf, PAGE_SIZE, "%llx\n",
+				value.int64val);
+	else if (off ==  POWER_SUPPLY_PROP_REVERSE_CHG_STATE)
+		return scnprintf(buf, PAGE_SIZE, "%d\n",
+				value.intval);
+	else if (off == POWER_SUPPLY_PROP_RX_CR)
+		return scnprintf(buf, PAGE_SIZE, "%llx\n",
+				value.int64val);
+	else if (off == POWER_SUPPLY_PROP_RX_CEP)
+		return scnprintf(buf, PAGE_SIZE, "%llx\n",
+				value.int64val);
+	else if (off == POWER_SUPPLY_PROP_BT_STATE)
+		return scnprintf(buf, PAGE_SIZE, "%x\n",
+				value.intval);
 	else
 		return sprintf(buf, "%d\n", value.intval);
 }
@@ -174,6 +203,8 @@ static ssize_t power_supply_store_property(struct device *dev,
 	struct power_supply *psy = dev_get_drvdata(dev);
 	const ptrdiff_t off = attr - power_supply_attrs;
 	union power_supply_propval value;
+	long val;
+	int64_t num_long;
 
 	/* maybe it is a enum property? */
 	switch (off) {
@@ -194,6 +225,31 @@ static ssize_t power_supply_store_property(struct device *dev,
 		break;
 	case POWER_SUPPLY_PROP_SCOPE:
 		ret = sysfs_match_string(power_supply_scope_text, buf);
+		break;
+	case POWER_SUPPLY_PROP_BT_STATE:
+	case POWER_SUPPLY_PROP_RX_CR:
+		ret = kstrtol(buf, 16, &val);
+		if (ret < 0)
+			return ret;
+		ret = val;
+		break;
+	case POWER_SUPPLY_PROP_RX_CEP:
+		ret = kstrtol(buf, 16, &val);
+		if (ret < 0)
+			return ret;
+		ret = val;
+		break;
+	case POWER_SUPPLY_PROP_TX_MAC:
+		ret = kstrtoll(buf, 16, &num_long);
+		if (ret < 0)
+			return ret;
+		value.int64val = num_long;
+		ret = power_supply_set_property(psy, off, &value);
+		if (ret < 0)
+			return ret;
+		else
+			return count;
+
 		break;
 	default:
 		ret = -EINVAL;
@@ -254,6 +310,8 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(charge_now),
 	POWER_SUPPLY_ATTR(charge_avg),
 	POWER_SUPPLY_ATTR(charge_counter),
+	POWER_SUPPLY_ATTR(termination_current),
+	POWER_SUPPLY_ATTR(ffc_termination_current),
 	POWER_SUPPLY_ATTR(constant_charge_current),
 	POWER_SUPPLY_ATTR(constant_charge_current_max),
 	POWER_SUPPLY_ATTR(constant_charge_voltage),
@@ -271,6 +329,9 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(capacity_alert_min),
 	POWER_SUPPLY_ATTR(capacity_alert_max),
 	POWER_SUPPLY_ATTR(capacity_level),
+	POWER_SUPPLY_ATTR(soc_decimal),
+	POWER_SUPPLY_ATTR(soc_decimal_rate),
+	POWER_SUPPLY_ATTR(cold_thermal_level),
 	POWER_SUPPLY_ATTR(temp),
 	POWER_SUPPLY_ATTR(temp_max),
 	POWER_SUPPLY_ATTR(temp_min),
@@ -294,6 +355,8 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(charge_enabled),
 	POWER_SUPPLY_ATTR(set_ship_mode),
 	POWER_SUPPLY_ATTR(real_type),
+	POWER_SUPPLY_ATTR(hvdcp3_type),
+	POWER_SUPPLY_ATTR(quick_charge_type),
 	POWER_SUPPLY_ATTR(charge_now_raw),
 	POWER_SUPPLY_ATTR(charge_now_error),
 	POWER_SUPPLY_ATTR(capacity_raw),
@@ -304,6 +367,8 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(pin_enabled),
 	POWER_SUPPLY_ATTR(input_suspend),
 	POWER_SUPPLY_ATTR(input_voltage_regulation),
+	POWER_SUPPLY_ATTR(input_voltage_vrect),
+	POWER_SUPPLY_ATTR(rx_iout),
 	POWER_SUPPLY_ATTR(input_current_max),
 	POWER_SUPPLY_ATTR(input_current_trim),
 	POWER_SUPPLY_ATTR(input_current_settled),
@@ -348,8 +413,11 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(typec_src_rp),
 	POWER_SUPPLY_ATTR(pd_allowed),
 	POWER_SUPPLY_ATTR(pd_active),
+	POWER_SUPPLY_ATTR(pd_authentication),
+	POWER_SUPPLY_ATTR(pd_remove_compensation),
 	POWER_SUPPLY_ATTR(pd_in_hard_reset),
 	POWER_SUPPLY_ATTR(pd_current_max),
+	POWER_SUPPLY_ATTR(apdo_max),
 	POWER_SUPPLY_ATTR(pd_usb_suspend_supported),
 	POWER_SUPPLY_ATTR(charger_temp),
 	POWER_SUPPLY_ATTR(charger_temp_max),
@@ -362,6 +430,8 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(parallel_mode),
 	POWER_SUPPLY_ATTR(die_health),
 	POWER_SUPPLY_ATTR(connector_health),
+	POWER_SUPPLY_ATTR(connector_temp),
+	POWER_SUPPLY_ATTR(vbus_disable),
 	POWER_SUPPLY_ATTR(ctm_current_max),
 	POWER_SUPPLY_ATTR(hw_current_max),
 	POWER_SUPPLY_ATTR(pr_swap),
@@ -371,15 +441,38 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(pd_voltage_max),
 	POWER_SUPPLY_ATTR(pd_voltage_min),
 	POWER_SUPPLY_ATTR(sdp_current_max),
+	POWER_SUPPLY_ATTR(dc_thermal_levels),
 	POWER_SUPPLY_ATTR(connector_type),
 	POWER_SUPPLY_ATTR(parallel_batfet_mode),
 	POWER_SUPPLY_ATTR(parallel_fcc_max),
+	POWER_SUPPLY_ATTR(wireless_version),
+	POWER_SUPPLY_ATTR(wireless_fw_version),
+	POWER_SUPPLY_ATTR(signal_strength),
+	POWER_SUPPLY_ATTR(wireless_cp_en),
+	POWER_SUPPLY_ATTR(wireless_power_good_en),
+	POWER_SUPPLY_ATTR(sw_disabel_dc_en),
+	POWER_SUPPLY_ATTR(wireless_wakelock),
+	POWER_SUPPLY_ATTR(wireless_tx_id),
+	POWER_SUPPLY_ATTR(tx_adapter),
+	POWER_SUPPLY_ATTR(tx_mac),
+	POWER_SUPPLY_ATTR(rx_cr),
+	POWER_SUPPLY_ATTR(rx_cep),
+	POWER_SUPPLY_ATTR(bt_state),
 	POWER_SUPPLY_ATTR(min_icl),
 	POWER_SUPPLY_ATTR(moisture_detected),
 	POWER_SUPPLY_ATTR(batt_profile_version),
 	POWER_SUPPLY_ATTR(batt_full_current),
+	POWER_SUPPLY_ATTR(battery_charging_limited),
+	POWER_SUPPLY_ATTR(slowly_charging),
 	POWER_SUPPLY_ATTR(recharge_soc),
+	POWER_SUPPLY_ATTR(recharge_vbat),
+	POWER_SUPPLY_ATTR(sys_termination_current),
+	POWER_SUPPLY_ATTR(ffc_sys_termination_current),
+	POWER_SUPPLY_ATTR(vbatt_full_vol),
+	POWER_SUPPLY_ATTR(fcc_vbatt_full_vol),
+	POWER_SUPPLY_ATTR(ki_coeff_current),
 	POWER_SUPPLY_ATTR(hvdcp_opti_allowed),
+	POWER_SUPPLY_ATTR(fastcharge_mode),
 	POWER_SUPPLY_ATTR(smb_en_mode),
 	POWER_SUPPLY_ATTR(smb_en_reason),
 	POWER_SUPPLY_ATTR(esr_actual),
@@ -389,6 +482,9 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(force_recharge),
 	POWER_SUPPLY_ATTR(fcc_stepper_enable),
 	POWER_SUPPLY_ATTR(toggle_stat),
+	POWER_SUPPLY_ATTR(type_recheck),
+	POWER_SUPPLY_ATTR(liquid_detection),
+	POWER_SUPPLY_ATTR(dynamic_fv_enabled),
 	POWER_SUPPLY_ATTR(main_fcc_max),
 	POWER_SUPPLY_ATTR(fg_reset),
 	POWER_SUPPLY_ATTR(qc_opti_disable),
@@ -396,6 +492,7 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(batt_age_level),
 	POWER_SUPPLY_ATTR(voltage_vph),
 	POWER_SUPPLY_ATTR(chip_version),
+	POWER_SUPPLY_ATTR(chip_ok),
 	POWER_SUPPLY_ATTR(therm_icl_limit),
 	POWER_SUPPLY_ATTR(dc_reset),
 	POWER_SUPPLY_ATTR(scale_mode_en),
@@ -420,8 +517,21 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(cp_toggle_switcher),
 	POWER_SUPPLY_ATTR(cp_irq_status),
 	POWER_SUPPLY_ATTR(cp_ilim),
+	POWER_SUPPLY_ATTR(step_index),
 	POWER_SUPPLY_ATTR(irq_status),
 	POWER_SUPPLY_ATTR(parallel_output_mode),
+	/* DIV 2 properties */
+	POWER_SUPPLY_ATTR(div_2_mode),
+	POWER_SUPPLY_ATTR(reverse_chg_mode),
+	POWER_SUPPLY_ATTR(reverse_chg_state),
+	POWER_SUPPLY_ATTR(reverse_gpio_state),
+	POWER_SUPPLY_ATTR(reset_div_2_mode),
+	POWER_SUPPLY_ATTR(otg_state),
+	POWER_SUPPLY_ATTR(reverse_vout),
+	POWER_SUPPLY_ATTR(reverse_iout),
+	POWER_SUPPLY_ATTR(rx_op_ble),
+	POWER_SUPPLY_ATTR(op_ble),
+	
 	/* Local extensions of type int64_t */
 	POWER_SUPPLY_ATTR(charge_counter_ext),
 	/* Properties of type `const char *' */
