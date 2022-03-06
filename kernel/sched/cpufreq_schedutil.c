@@ -224,7 +224,6 @@ static unsigned int get_next_freq(struct sugov_policy *sg_policy,
 static void sugov_get_util(struct sugov_cpu *sg_cpu)
 {
 	struct rq *rq = cpu_rq(sg_cpu->cpu);
-	struct sugov_cpu sg_cpu->loadcpu = &per_cpu(sugov_cpu, sg_cpu->cpu);
 
 	sg_cpu->max = arch_scale_cpu_capacity(NULL, sg_cpu->cpu);
 	sg_cpu->util_cfs = cpu_util_cfs(rq);
@@ -252,9 +251,8 @@ static unsigned long sugov_aggregate_util(struct sugov_cpu *sg_cpu)
 	 */
 	return min(util, sg_cpu->max);
 
-	return boosted_cpu_util(sg_cpu->cpu,&sg_cpu->loadcpu->walt_load);
-
 #ifdef CONFIG_UCLAMP_TASK
+    util+=cpu_util_freq_walt(sg_cpu->cpu, &sg_cpu->walt_load);
    	return uclamp_rq_util_with(rq, util, NULL);
 #endif
 }
@@ -347,7 +345,6 @@ static void sugov_update_single(struct update_util_data *hook, u64 time,
 	if (flags & SCHED_CPUFREQ_PL)
 		return;
 
-	flags &= ~SCHED_CPUFREQ_RT;
 	sugov_set_iowait_boost(sg_cpu, time, flags);
 	sg_cpu->last_update = time;
 
@@ -429,8 +426,6 @@ static void sugov_update_shared(struct update_util_data *hook, u64 time,
 
 	if (flags & SCHED_CPUFREQ_PL)
 		return;
-
-	flags &= ~SCHED_CPUFREQ_RT;
 
 	raw_spin_lock(&sg_policy->update_lock);
 
