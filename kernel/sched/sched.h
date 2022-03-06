@@ -27,6 +27,7 @@
 #include <linux/binfmts.h>
 #include <linux/mutex.h>
 #include <linux/energy_model.h>
+#include <linux/cpuset.h>
 #include <linux/psi.h>
 #include <linux/spinlock.h>
 #include <linux/stop_machine.h>
