@@ -229,8 +229,10 @@ unsigned long schedutil_freq_util(int cpu, unsigned long util_cfs,
 	unsigned long dl_util, util;
 	struct rq *rq = cpu_rq(cpu);
 
-	if (type == FREQUENCY_UTIL && rt_rq_is_runnable(&rq->rt))
+	if (!IS_BUILTIN(CONFIG_UCLAMP_TASK) &&
+	    type == FREQUENCY_UTIL && rt_rq_is_runnable(&rq->rt)) {
 		return max;
+	}
 
     /*
 	 * Because the time spend on RT/DL tasks is visible as 'lost' time to
@@ -238,7 +240,9 @@ unsigned long schedutil_freq_util(int cpu, unsigned long util_cfs,
 	 * utilization (PELT windows are synchronized) we can directly add them
 	 * to obtain the CPU's actual utilization.
 	 */
-	util = util_cfs;
+	if (type == FREQUENCY_UTIL)
+		util = uclamp_rq_util_with(rq, util, NULL);
+		
 	dl_util = cpu_util_dl(rq);
 
 	/*
@@ -273,8 +277,8 @@ static unsigned long sugov_get_util(struct sugov_cpu *sg_cpu)
 	sg_cpu->max = max;
 	sg_cpu->util_dl = cpu_util_dl(rq);
 
-#ifdef CONFIG_UCLAMP_TASK
-    util =cpu_util_freq_walt(sg_cpu->cpu, &sg_cpu->walt_load);
+#ifdef CONFIG_SCHED_WALT
+    util = cpu_util_freq_walt(sg_cpu->cpu, &sg_cpu->walt_load);
    	return uclamp_rq_util_with(rq, util, NULL);
 #else
     util = cpu_util_cfs(rq);
