@@ -224,7 +224,7 @@ static unsigned int get_next_freq(struct sugov_policy *sg_policy,
 }
 
 unsigned long schedutil_freq_util(int cpu, unsigned long util_cfs,
-				  unsigned long max, enum schedutil_type type)
+				  unsigned long max, enum schedutil_type type,struct task_struct *p)
 {
 	unsigned long dl_util, util;
 	struct rq *rq = cpu_rq(cpu);
@@ -241,7 +241,7 @@ unsigned long schedutil_freq_util(int cpu, unsigned long util_cfs,
 	 * to obtain the CPU's actual utilization.
 	 */
 	if (type == FREQUENCY_UTIL)
-		util = uclamp_rq_util_with(rq, util, NULL);
+		util = uclamp_rq_util_with(rq, util, p);
 		
 	dl_util = cpu_util_dl(rq);
 
@@ -282,7 +282,7 @@ static unsigned long sugov_get_util(struct sugov_cpu *sg_cpu)
    	return uclamp_rq_util_with(rq, util, NULL);
 #else
     util = cpu_util_cfs(rq);
-	return schedutil_freq_util(sg_cpu->cpu, util, max, FREQUENCY_UTIL);
+	return schedutil_freq_util(sg_cpu->cpu, util, max, FREQUENCY_UTIL, NULL);
 #endif
 }
 
