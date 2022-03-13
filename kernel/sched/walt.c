@@ -3105,7 +3105,8 @@ static void walt_update_coloc_boost_load(void)
 		return;
 
 	grp = lookup_related_thread_group(DEFAULT_CGROUP_COLOC_ID);
-	return grp && grp->skip_min;
+	if (grp && grp->skip_min)
+	    return;
 
 	for_each_sched_cluster(cluster) {
 		if (is_min_capacity_cluster(cluster)) {
