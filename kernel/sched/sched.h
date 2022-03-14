@@ -974,7 +974,6 @@ struct rq {
 	struct cpumask freq_domain_cpumask;
 	struct walt_sched_stats walt_stats;
 
-	int cstate, wakeup_latency, wakeup_energy;
 	u64 window_start;
 	u32	prev_window_size;
 	unsigned long walt_flags;

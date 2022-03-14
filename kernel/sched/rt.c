@@ -1881,8 +1881,6 @@ retry:
 			 * conditions are same, select the least cumulative
 			 * window demand CPU.
 			 */
-			if (sysctl_sched_cstate_aware)
-				cpu_idle_idx = idle_get_state_idx(cpu_rq(cpu));
 
 			util_cum = cpu_util_cum(cpu, 0);
 			if (cpu != task_cpu(task) && best_cpu_util == util) {

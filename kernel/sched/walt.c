@@ -3642,9 +3642,6 @@ void walt_sched_init_rq(struct rq *rq)
 	rq->irqload_ts = 0;
 	rq->static_cpu_pwr_cost = 0;
 	rq->task_exec_scale = 1024;
-	rq->cstate = 0;
-	rq->wakeup_latency = 0;
-	rq->wakeup_energy = 0;
 
 	/*
 	 * All cpus part of same cluster by default. This avoids the

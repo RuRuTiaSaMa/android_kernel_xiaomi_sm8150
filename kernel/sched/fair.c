@@ -97,10 +97,6 @@ unsigned int normalized_sysctl_sched_latency		= 6000000ULL;
  * Enable/disable honoring sync flag in energy-aware wakeups.
  */
 unsigned int sysctl_sched_sync_hint_enable = 1;
-/*
- * Enable/disable using cstate knowledge in idle sibling selection
- */
-unsigned int sysctl_sched_cstate_aware = 1;
 
 /*
  * The initial- and re-scaling of tunables is configurable
@@ -7227,7 +7223,7 @@ static int select_idle_cpu(struct task_struct *p, struct sched_domain *sd, int t
 /*
  * Try and locate an idle core/thread in the LLC cache domain.
  */
-static inline int __select_idle_sibling(struct task_struct *p, int prev, int target)
+static inline int select_idle_sibling(struct task_struct *p, int prev, int target)
 {
 	struct sched_domain *sd;
 	int i;
@@ -7259,82 +7255,6 @@ static inline int __select_idle_sibling(struct task_struct *p, int prev, int tar
 		return i;
 
 	return target;
-}
-
-static inline int select_idle_sibling_cstate_aware(struct task_struct *p, int prev, int target)
-{
-	struct sched_domain *sd;
-	struct sched_group *sg;
-	int best_idle_cpu = -1;
-	int best_idle_cstate = -1;
-	int best_idle_capacity = INT_MAX;
-	int i;
-
-	/*
-	 * Iterate the domains and find an elegible idle cpu.
-	 */
-	sd = rcu_dereference(per_cpu(sd_llc, target));
-	for_each_lower_domain(sd) {
-		sg = sd->groups;
-		do {
-			if (!cpumask_intersects(
-					sched_group_span(sg), &p->cpus_allowed))
-				goto next;
-
-			for_each_cpu_and(i, &p->cpus_allowed, sched_group_span(sg)) {
-				int idle_idx;
-				unsigned long new_usage;
-				unsigned long capacity_orig;
-
-				if (!idle_cpu(i))
-					goto next;
-
-				if (cpu_isolated(i))
-					continue;
-
-				/* figure out if the task can fit here at all */
-				new_usage = boosted_task_util(p);
-				capacity_orig = capacity_orig_of(i);
-
-				if (new_usage > capacity_orig)
-					goto next;
-
-				/* if the task fits without changing OPP and we
-				 * intended to use this CPU, just proceed
-				 */
-				if (i == target && new_usage <= capacity_curr_of(target)) {
-					return target;
-				}
-
-				/* otherwise select CPU with shallowest idle state
-				 * to reduce wakeup latency.
-				 */
-				idle_idx = idle_get_state_idx(cpu_rq(i));
-
-				if (idle_idx < best_idle_cstate &&
-					capacity_orig <= best_idle_capacity) {
-					best_idle_cpu = i;
-					best_idle_cstate = idle_idx;
-					best_idle_capacity = capacity_orig;
-				}
-			}
-	next:
-			sg = sg->next;
-		} while (sg != sd->groups);
-	}
-
-	if (best_idle_cpu >= 0)
-		target = best_idle_cpu;
-
-	return target;
-}
-
-static int select_idle_sibling(struct task_struct *p, int prev, int target)
-{
-	if (!sysctl_sched_cstate_aware)
-		return __select_idle_sibling(p, prev, target);
-
-	return select_idle_sibling_cstate_aware(p, prev, target);
 }
 
 static inline bool task_fits_capacity(struct task_struct *p,
@@ -7403,14 +7323,11 @@ struct find_best_target_env {
 static bool is_packing_eligible(struct task_struct *p, int target_cpu,
 				struct find_best_target_env *fbt_env,
 				unsigned int target_cpus_count,
-				int best_idle_cstate, bool boosted)
+				bool boosted)
 {
 	unsigned long tutil, estimated_capacity;
 
 	if (task_placement_boost_enabled(p) || fbt_env->need_idle || boosted)
-		return false;
-
-	if (best_idle_cstate == -1)
 		return false;
 
 	if (target_cpus_count != 1)
@@ -7537,7 +7454,6 @@ static inline int find_best_target(struct task_struct *p, int *backup_cpu,
 	unsigned long best_active_util = ULONG_MAX;
 	unsigned long best_active_cuml_util = ULONG_MAX;
 	unsigned long best_idle_cuml_util = ULONG_MAX;
-	int best_idle_cstate = INT_MAX;
 	struct sched_domain *sd;
 	struct sched_group *sg;
 	int best_active_cpu = -1;
@@ -7723,13 +7639,10 @@ static inline int find_best_target(struct task_struct *p, int *backup_cpu,
 					if (!boosted &&
 					    capacity_orig > target_capacity)
 						continue;
-					if (capacity_orig == target_capacity &&
-					    sysctl_sched_cstate_aware &&
-					    best_idle_cstate <= idle_idx)
+					if (capacity_orig == target_capacity)
 						continue;
 
 					target_capacity = capacity_orig;
-					best_idle_cstate = idle_idx;
 					best_idle_cpu = i;
 					continue;
 				}
@@ -7817,19 +7730,15 @@ static inline int find_best_target(struct task_struct *p, int *backup_cpu,
 				 * IOW, prefer a deep IDLE LITTLE CPU vs a
 				 * shallow idle big CPU.
 				 */
-				if (capacity_orig >= target_capacity &&
-				    sysctl_sched_cstate_aware &&
-				    best_idle_cstate < idle_idx)
+				if (capacity_orig >= target_capacity )
 					continue;
 
-				if (best_idle_cstate == idle_idx &&
-					(best_idle_cpu == prev_cpu ||
+				if ((best_idle_cpu == prev_cpu ||
 					(i != prev_cpu &&
 					new_util_cuml > best_idle_cuml_util)))
 					continue;
 
 				target_capacity = capacity_orig;
-				best_idle_cstate = idle_idx;
 				best_idle_cuml_util = new_util_cuml;
 				best_idle_cpu = i;
 				continue;
@@ -7918,7 +7827,7 @@ static inline int find_best_target(struct task_struct *p, int *backup_cpu,
 	} while (sg = sg->next, sg != sd->groups);
 
 	if (best_idle_cpu != -1 && !is_packing_eligible(p, target_cpu, fbt_env,
-					active_cpus_count, best_idle_cstate,
+					active_cpus_count,
 					boosted)) {
 		target_cpu = best_idle_cpu;
 		best_idle_cpu = -1;
